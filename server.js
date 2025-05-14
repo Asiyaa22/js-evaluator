@@ -57,20 +57,33 @@ function runTest(studentCode, functionName, testCases) {
 }
 
 // Route to accept zip file
-app.post('/evaluate', upload.single('zipFile'), async (req, res) => {
-  try {
-    console.log('📦 Received file:', req.file);  // Add this
-    if (!req.file) {
-  return res.status(400).json({ error: "No file received. Make sure you're uploading with the field name 'zipFile'." });
-}
-    const zipPath = req.file.path;
-    const EXTRACT_DIR = path.join(__dirname, 'submissions');
+// app.post('/evaluate', upload.single('zipFile'), async (req, res) => {
+app.post('/evaluate', multer().any(), async (req, res) => {
+  const uploadedFile = req.files?.[0];
+  console.log('📦 Received file:', uploadedFile);
 
-    clearFolder(EXTRACT_DIR);
+  if (!uploadedFile) {
+    return res.status(400).json({ error: "No file received. Upload a ZIP file of student folders." });
+  }
 
+  const zipPath = uploadedFile.path || uploadedFile.buffer;
+  const EXTRACT_DIR = path.join(__dirname, 'submissions');
+  clearFolder(EXTRACT_DIR);
+
+  // ✅ Extract zip from buffer or path
+  if (uploadedFile.buffer) {
+    const tempZipPath = path.join(__dirname, 'temp-upload.zip');
+    fs.writeFileSync(tempZipPath, uploadedFile.buffer);
+    const zip = new AdmZip(tempZipPath);
+    zip.extractAllTo(EXTRACT_DIR, true);
+    fs.unlinkSync(tempZipPath);
+  } else {
     const zip = new AdmZip(zipPath);
     zip.extractAllTo(EXTRACT_DIR, true);
+  }
 
+  // ✅ Continue with your evaluation logic
+  try {
     let students = [];
     const subDirs = fs.readdirSync(EXTRACT_DIR).map(p => path.join(EXTRACT_DIR, p));
     for (const subDir of subDirs) {
@@ -112,12 +125,13 @@ app.post('/evaluate', upload.single('zipFile'), async (req, res) => {
     }
 
     res.json({ results });
+
   } catch (err) {
-    console.error(err);
+    console.error('❌ Evaluation error:', err);
     res.status(500).json({ error: 'Evaluation failed.' });
   }
 });
-
+  
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
