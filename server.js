@@ -59,6 +59,10 @@ function runTest(studentCode, functionName, testCases) {
 // Route to accept zip file
 app.post('/evaluate', upload.single('zipFile'), async (req, res) => {
   try {
+    console.log('📦 Received file:', req.file);  // Add this
+    if (!req.file) {
+  return res.status(400).json({ error: "No file received. Make sure you're uploading with the field name 'zipFile'." });
+}
     const zipPath = req.file.path;
     const EXTRACT_DIR = path.join(__dirname, 'submissions');
 
