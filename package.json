@@ -1,0 +1,19 @@
+{
+  "name": "js-evaluator",
+  "version": "1.0.0",
+  "description": "JavaScript evaluator for student assignments using vm2",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "csv-writer": "^1.6.0",
+    "express": "^5.1.0",
+    "multer": "^1.4.5-lts.2",
+    "vm2": "^3.9.19"
+  },
+  "author": "",
+  "license": "ISC"
+}
