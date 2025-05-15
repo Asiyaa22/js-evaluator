@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
+import axios from 'axios';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
@@ -13,11 +14,11 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.use(express.json());
 
-// File upload config
+// Zip folder to extract submissions
 const upload = multer({ dest: 'uploads/' });
 
-// Cleanup helper
 function clearFolder(folderPath) {
   if (fs.existsSync(folderPath)) {
     fs.rmSync(folderPath, { recursive: true, force: true });
@@ -25,7 +26,6 @@ function clearFolder(folderPath) {
   fs.mkdirSync(folderPath);
 }
 
-// JS evaluator logic
 function getJSFile(folderPath) {
   const files = fs.readdirSync(folderPath);
   return files.find(f => f.endsWith('.js'));
@@ -56,34 +56,28 @@ function runTest(studentCode, functionName, testCases) {
   }
 }
 
-// Route to accept zip file
-// app.post('/evaluate', upload.single('zipFile'), async (req, res) => {
-app.post('/evaluate', multer().single('zipFile'), async (req, res) => {
-  const uploadedFile = req.files;
-  console.log('📦 Received file:', uploadedFile);
+// 🆕 Route to accept a zip file URL instead of file upload
+app.post('/evaluate-by-url', async (req, res) => {
+  try {
+    const { zipUrl } = req.body;
+    if (!zipUrl) {
+      return res.status(400).json({ error: "Missing zipUrl in request body." });
+    }
 
-  if (!uploadedFile) {
-    return res.status(400).json({ error: "No file received. Upload a ZIP file of student folders." });
-  }
+    console.log('🌐 Downloading ZIP from URL:', zipUrl);
 
-  const zipPath = uploadedFile.path || uploadedFile.buffer;
-  const EXTRACT_DIR = path.join(__dirname, 'submissions');
-  clearFolder(EXTRACT_DIR);
+    const zipResponse = await axios.get(zipUrl, { responseType: 'arraybuffer' });
 
-  // ✅ Extract zip from buffer or path
-  if (uploadedFile.buffer) {
-    const tempZipPath = path.join(__dirname, 'temp-upload.zip');
-    fs.writeFileSync(tempZipPath, uploadedFile.buffer);
+    const EXTRACT_DIR = path.join(__dirname, 'submissions');
+    clearFolder(EXTRACT_DIR);
+
+    const tempZipPath = path.join(__dirname, 'temp-download.zip');
+    fs.writeFileSync(tempZipPath, zipResponse.data);
     const zip = new AdmZip(tempZipPath);
     zip.extractAllTo(EXTRACT_DIR, true);
     fs.unlinkSync(tempZipPath);
-  } else {
-    const zip = new AdmZip(zipPath);
-    zip.extractAllTo(EXTRACT_DIR, true);
-  }
 
-  // ✅ Continue with your evaluation logic
-  try {
+    // Evaluation logic
     let students = [];
     const subDirs = fs.readdirSync(EXTRACT_DIR).map(p => path.join(EXTRACT_DIR, p));
     for (const subDir of subDirs) {
@@ -127,11 +121,11 @@ app.post('/evaluate', multer().single('zipFile'), async (req, res) => {
     res.json({ results });
 
   } catch (err) {
-    console.error('❌ Evaluation error:', err);
-    res.status(500).json({ error: 'Evaluation failed.' });
+    console.error("❌ Evaluation from URL failed:", err);
+    res.status(500).json({ error: "Evaluation from URL failed." });
   }
 });
-  
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
