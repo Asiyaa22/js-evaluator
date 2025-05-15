@@ -58,8 +58,8 @@ function runTest(studentCode, functionName, testCases) {
 
 // Route to accept zip file
 // app.post('/evaluate', upload.single('zipFile'), async (req, res) => {
-app.post('/evaluate', multer().any(), async (req, res) => {
-  const uploadedFile = req.files?.[0];
+app.post('/evaluate', multer().single('zipFile'), async (req, res) => {
+  const uploadedFile = req.files;
   console.log('📦 Received file:', uploadedFile);
 
   if (!uploadedFile) {
