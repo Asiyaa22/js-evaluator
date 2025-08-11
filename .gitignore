@@ -1,5 +1,7 @@
 node_modules/
 results.csv
 submissions/
-uploads/
 .env
+evaluatornew.js
+server-old.js
+servernew.js

@@ -1,12 +1,13 @@
 // Import required modules
-import express from 'express';                     // Web server
-import multer from 'multer';                       // (unused now) File upload utility
-import path from 'path';                           // Path utilities
-import axios from 'axios';                         // For downloading zip and test case files
-import fs from 'fs';                               // File system utilities
-import { fileURLToPath } from 'url';               // Support __dirname in ES modules
-import AdmZip from 'adm-zip';                      // To unzip the ZIP file
-import { VM } from 'vm2';                          // Secure sandbox to run JS code
+import express from 'express';           // Web server
+import multer from 'multer';             // (Unused now) File upload utility
+import path from 'path';                 // Path utilities
+import axios from 'axios';               // For downloading zip and test case files
+import fs from 'fs';                     // File system utilities
+import { fileURLToPath } from 'url';     // Support __dirname in ES modules
+import AdmZip from 'adm-zip';            // To unzip the ZIP file
+import { VM } from 'vm2';                // Secure sandbox to run JS code
+import { createObjectCsvWriter as csvWriter } from 'csv-writer'; // For generating CSV
 
 // Define file path utilities for ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -19,6 +20,9 @@ const PORT = process.env.PORT || 3000;
 // Enable JSON parsing in request body
 app.use(express.json());
 
+// Serve static files (for CSV download)
+app.use(express.static(path.join(__dirname, 'public')));
+
 // Unused multer setup (kept in case you want to support file uploads later)
 const upload = multer({ dest: 'uploads/' });
 
@@ -27,13 +31,34 @@ function clearFolder(folderPath) {
   if (fs.existsSync(folderPath)) {
     fs.rmSync(folderPath, { recursive: true, force: true });
   }
-  fs.mkdirSync(folderPath);
+  fs.mkdirSync(folderPath, { recursive: true });
 }
 
 // Utility: Find the `.js` file in a student folder
 function getJSFile(folderPath) {
   const files = fs.readdirSync(folderPath);
   return files.find(f => f.endsWith('.js'));
+}
+
+// NEW Utility: Recursively scan a directory to find all student folders
+function scanForStudentFolders(baseDir) {
+  let studentDirs = [];
+  const items = fs.readdirSync(baseDir);
+
+  for (const item of items) {
+    const fullPath = path.join(baseDir, item);
+    if (fs.statSync(fullPath).isDirectory()) {
+      // If the directory contains at least one .js file, treat it as a student folder
+      const jsFiles = fs.readdirSync(fullPath).filter(f => f.endsWith('.js'));
+      if (jsFiles.length > 0) {
+        studentDirs.push(fullPath);
+      } else {
+        // Otherwise, go deeper
+        studentDirs = studentDirs.concat(scanForStudentFolders(fullPath));
+      }
+    }
+  }
+  return studentDirs;
 }
 
 // Core Evaluator: Run test cases on student function
@@ -91,29 +116,19 @@ app.post('/evaluate-by-url', async (req, res) => {
     const testCasesResponse = await axios.get(testCasesUrl);
     const testConfig = testCasesResponse.data;
 
-    // Extract the ZIP to /submissions/
+    // Prepare extraction directory
     const EXTRACT_DIR = path.join(__dirname, 'submissions');
     clearFolder(EXTRACT_DIR);
+
+    // Save and extract ZIP
     const tempZipPath = path.join(__dirname, 'temp-download.zip');
     fs.writeFileSync(tempZipPath, zipResponse.data);
     const zip = new AdmZip(tempZipPath);
     zip.extractAllTo(EXTRACT_DIR, true);
     fs.unlinkSync(tempZipPath);
 
-    // Identify student folders (deeply nested)
-    const subDirs = fs.readdirSync(EXTRACT_DIR).map(p => path.join(EXTRACT_DIR, p));
-    let students = [];
-
-    for (const subDir of subDirs) {
-      if (fs.statSync(subDir).isDirectory()) {
-        const innerFolders = fs.readdirSync(subDir).map(s => path.join(subDir, s));
-        for (const studentFolder of innerFolders) {
-          if (fs.statSync(studentFolder).isDirectory()) {
-            students.push(studentFolder);
-          }
-        }
-      }
-    }
+    // Find all student folders recursively
+    const students = scanForStudentFolders(EXTRACT_DIR);
 
     // Evaluate each student's submission
     const results = [];
@@ -144,8 +159,26 @@ app.post('/evaluate-by-url', async (req, res) => {
       });
     }
 
-    // Return JSON result
-    res.json({ results });
+    // --- NEW: Generate CSV file in /public folder ---
+    const publicDir = path.join(__dirname, 'public');
+    clearFolder(publicDir);
+
+    const csvPath = path.join(publicDir, 'results.csv');
+    const writer = csvWriter({
+      path: csvPath,
+      header: [
+        { id: 'student', title: 'Student Name' },
+        { id: 'marks', title: 'Marks' },
+        { id: 'feedback', title: 'Feedback' },
+      ],
+    });
+
+    await writer.writeRecords(results);
+
+    const csvUrl = `${req.protocol}://${req.get('host')}/results.csv`;
+
+    // Return JSON result + CSV link
+    res.json({ results, csvUrl });
 
   } catch (err) {
     console.error("❌ Evaluation from URL failed:", err);
