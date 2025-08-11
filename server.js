@@ -175,7 +175,7 @@ app.post('/evaluate-by-url', async (req, res) => {
 
     await writer.writeRecords(results);
 
-    const csvUrl = `${req.protocol}://${req.get('host')}/results.csv`;
+    const csvUrl = `${req.protocol}://${req.get('host')}/download-results`;
 
     // Return JSON result + CSV link
     res.json({ results, csvUrl });
@@ -185,6 +185,19 @@ app.post('/evaluate-by-url', async (req, res) => {
     res.status(500).json({ error: "Evaluation from URL failed." });
   }
 });
+
+app.get('/download-results', (req, res) => {
+  const filePath = path.join(__dirname, 'public', 'results.csv');
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send('Results file not found.');
+  }
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="results.csv"');
+  res.sendFile(filePath);
+});
+
 
 // Start the server
 app.listen(PORT, () => {
