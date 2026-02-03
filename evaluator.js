@@ -1,4 +1,5 @@
 // evaluator.mjs
+// This code is only CLI based
 
 import fs from 'fs';
 import path from 'path';

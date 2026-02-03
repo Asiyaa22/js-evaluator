@@ -61,6 +61,44 @@ function scanForStudentFolders(baseDir) {
   return studentDirs;
 }
 
+// For testing TEMP: Dummy editor API for testing
+// app.get('/dummy-submission/:id', (req, res) => {
+//   const submissions = {
+//     "1": {
+//       code: `
+//         function sum(a, b) {
+//           return a + b;
+//         }
+//       `
+//     },
+//     "2": {
+//       code: `
+//         function sum(a, b) {
+//           return a - b;
+//         }
+//       `
+//     }
+//   };
+
+//   res.json(submissions[req.params.id] || { code: "" });
+// });
+
+//for testing
+// app.get('/dummy-testcases', (req, res) => {
+//   res.json({
+//     testFunctions: [
+//       {
+//         functionName: "sum",
+//         testCases: [
+//           { input: [1, 2], expected: 3 },
+//           { input: [5, 7], expected: 12 }
+//         ]
+//       }
+//     ]
+//   });
+// });
+
+
 // Core Evaluator: Run test cases on student function
 function runTest(studentCode, functionName, testCases) {
   const vm = new VM({ timeout: 1000, sandbox: {} });
@@ -97,6 +135,86 @@ function runTest(studentCode, functionName, testCases) {
     return { score: 0, feedback: 'Code error. Check syntax or function structure.' };
   }
 }
+//Route: Evaluate by editor link
+app.post('/evaluate-batch-by-links', async (req, res) => {
+  try {
+    const { submissions, testCasesUrl } = req.body;
+
+    if (!submissions || !Array.isArray(submissions) || !testCasesUrl) {
+      return res.status(400).json({ error: "Invalid payload" });
+    }
+
+    // Fetch test cases once
+    const testCasesRes = await axios.get(testCasesUrl);
+    const testConfig = testCasesRes.data;
+
+    const results = [];
+
+    for (const sub of submissions) {
+      const { student, submissionLink } = sub;
+
+      try {
+        // Fetch code from editor DB
+        const codeRes = await axios.get(submissionLink);
+        const studentCode = codeRes.data.code;
+
+        if (!studentCode) {
+          results.push({
+            student,
+            marks: 0,
+            feedback: 'No code found in submission.'
+          });
+          continue;
+        }
+
+        let totalMarks = 0;
+        let feedbackList = [];
+
+        for (const fn of testConfig.testFunctions) {
+          const result = runTest(studentCode, fn.functionName, fn.testCases);
+          totalMarks += result.score;
+          feedbackList.push(`${fn.functionName}: ${result.feedback}`);
+        }
+
+        results.push({
+          student,
+          marks: totalMarks,
+          feedback: feedbackList.join(' | ')
+        });
+
+      } catch (err) {
+        results.push({
+          student,
+          marks: 0,
+          feedback: 'Failed to fetch or evaluate code.'
+        });
+      }
+    }
+
+    // Generate CSV
+    const publicDir = path.join(__dirname, 'public');
+    clearFolder(publicDir);
+
+    const csvPath = path.join(publicDir, 'results.csv');
+    const writer = csvWriter({
+      path: csvPath,
+      header: [
+        { id: 'student', title: 'Student Name' },
+        { id: 'marks', title: 'Marks' },
+        { id: 'feedback', title: 'Feedback' },
+      ],
+    });
+
+    await writer.writeRecords(results);
+
+    const csvUrl = `${req.protocol}://${req.get('host')}/download-results`;
+    res.json({ results, csvUrl });
+
+  } catch (err) {
+    console.error("Batch evaluation failed:", err);
+    res.status(500).json({ error: "Batch evaluation failed." });
+  }
+});
 
 // Route: Evaluate using zipUrl + testCasesUrl
 app.post('/evaluate-by-url', async (req, res) => {
