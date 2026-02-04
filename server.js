@@ -88,11 +88,13 @@ function scanForStudentFolders(baseDir) {
 //   res.json({
 //     testFunctions: [
 //       {
-//         functionName: "sum",
-//         testCases: [
-//           { input: [1, 2], expected: 3 },
-//           { input: [5, 7], expected: 12 }
-//         ]
+//         "functionName": "printNumbers",
+//       "testCases": [
+//         {
+//           "input": [],
+//           "expected": [10, 20, 30, 40, 50]
+//         }
+//       ]
 //       }
 //     ]
 //   });
