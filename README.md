@@ -14,12 +14,12 @@ Built for:
 
 ## What this Evaluator Does
 
-- ✔ Accepts **batch submission links**
-- ✔ Fetches **student code from backend database**
-- ✔ Runs code in a **secure VM sandbox (vm2)**
-- ✔ Evaluates against **predefined test cases**
-- ✔ Returns **marks + feedback**
-- ✔ Generates **CSV results** automatically
+- Accepts **batch submission links**
+- Fetches **student code from backend database**
+- Runs code in a **secure VM sandbox (vm2)**
+- Evaluates against **predefined test cases**
+- Returns **marks + feedback**
+- Generates **CSV results** automatically
 
 ---
 
@@ -218,3 +218,82 @@ function printNumbers() {
 ---
 
 **Happy Evaluating!**
+
+---
+
+## How to Fork, Clone & Run Locally
+
+Follow these steps to run the JS Evaluator on your local machine.
+
+---
+
+### 1. Fork the Repository
+- Click the **Fork** button on the top-right of this repository
+- This will create a copy under your GitHub account
+
+---
+
+### 2. Clone the Repository
+
+```bash
+git clone https://github.com/<your-username>/<repo-name>.git
+```
+
+```bash
+cd <repo-name>
+```
+
+---
+
+### 3. Install Dependencies
+
+Make sure **Node.js (v18+)** is installed.
+
+```bash
+npm install
+```
+
+> This evaluator does NOT require a database connection.  
+> It fetches student code using submission links.
+
+---
+
+### 4. Start the Server
+
+```bash
+node server.js
+```
+---
+
+### 5. Verify Server is Running
+
+Open browser or Postman:
+
+```text
+http://localhost:3000
+```
+
+You should see the evaluator running.
+
+---
+
+### 6. Test Using Postman
+
+Use the endpoint:
+
+```text
+POST http://localhost:3000/evaluate-batch-by-links
+```
+
+Refer to the **Postman request body** and **test cases format** mentioned above in this README.
+
+---
+
+### You’re Ready to Test!
+
+You can now:
+- Test batch submissions
+- Validate marks & feedback
+- Test failure cases
+- Verify CSV generation
+
