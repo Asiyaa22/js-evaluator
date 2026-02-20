@@ -84,21 +84,21 @@ function scanForStudentFolders(baseDir) {
 // });
 
 //for testing
-// app.get('/dummy-testcases', (req, res) => {
-//   res.json({
-//     testFunctions: [
-//       {
-//         "functionName": "printNumbers",
-//       "testCases": [
-//         {
-//           "input": [],
-//           "expected": [10, 20, 30, 40, 50]
-//         }
-//       ]
-//       }
-//     ]
-//   });
-// });
+app.get('/dummy-testcases', (req, res) => {
+  res.json({
+    testFunctions: [
+      {
+        "functionName": "printNumbers",
+      "testCases": [
+        {
+          "input": [],
+          "expected": [10, 20, 30, 40, 50]
+        }
+      ]
+      }
+    ]
+  });
+});
 
 
 // Core Evaluator: Run test cases on student function
@@ -140,31 +140,31 @@ function runTest(studentCode, functionName, testCases) {
 //Route: Evaluate by editor link
 app.post('/evaluate-batch-by-links', async (req, res) => {
   try {
-    const { submissions, testCasesUrl } = req.body;
+    const { submissions, testCases } = req.body;
 
     if (!submissions || !Array.isArray(submissions) || !testCasesUrl) {
       return res.status(400).json({ error: "Invalid payload" });
     }
 
     // Fetch test cases once
-    const testCasesRes = await axios.get(testCasesUrl);
-    const testConfig = testCasesRes.data;
+    // const testCasesRes = await axios.get(testCasesUrl);
+    const testConfig = testCases;
 
     const results = [];
-
-    for (const sub of submissions) {
-      const { student, submissionLink } = sub;
+  for (const sub of submissions) {
+      const { submissionId, studentId, studentName, repoLink } = sub;
 
       try {
-        // Fetch code from editor DB
-        const codeRes = await axios.get(submissionLink);
+        const codeRes = await axios.get(repoLink);
         const studentCode = codeRes.data.code;
 
         if (!studentCode) {
           results.push({
-            student,
-            marks: 0,
-            feedback: 'No code found in submission.'
+            submissionId,
+            studentId,
+            studentName,
+            score: 0,
+            feedback: "No code found."
           });
           continue;
         }
@@ -172,47 +172,61 @@ app.post('/evaluate-batch-by-links', async (req, res) => {
         let totalMarks = 0;
         let feedbackList = [];
 
-        for (const fn of testConfig.testFunctions) {
-          const result = runTest(studentCode, fn.functionName, fn.testCases);
+        for (const fn of testCases.testFunctions) {
+          const result = runTest(
+            studentCode,
+            fn.functionName,
+            fn.testCases
+          );
+
           totalMarks += result.score;
           feedbackList.push(`${fn.functionName}: ${result.feedback}`);
         }
 
         results.push({
-          student,
-          marks: totalMarks,
-          feedback: feedbackList.join(' | ')
+          submissionId,
+          studentId,
+          studentName,
+          score: totalMarks,
+          feedback: feedbackList.join(" | ")
         });
 
-      } catch (err) {
+      } catch {
         results.push({
-          student,
-          marks: 0,
-          feedback: 'Failed to fetch or evaluate code.'
+          submissionId,
+          studentId,
+          studentName,
+          score: 0,
+          feedback: "Failed to fetch or evaluate code."
         });
       }
     }
 
+    return res.json({ results });
+
+  }
+  
+
     // Generate CSV
-    const publicDir = path.join(__dirname, 'public');
-    clearFolder(publicDir);
+    // const publicDir = path.join(__dirname, 'public');
+    // clearFolder(publicDir);
 
-    const csvPath = path.join(publicDir, 'results.csv');
-    const writer = csvWriter({
-      path: csvPath,
-      header: [
-        { id: 'student', title: 'Student Name' },
-        { id: 'marks', title: 'Marks' },
-        { id: 'feedback', title: 'Feedback' },
-      ],
-    });
+    // const csvPath = path.join(publicDir, 'results.csv');
+    // const writer = csvWriter({
+    //   path: csvPath,
+    //   header: [
+    //     { id: 'student', title: 'Student Name' },
+    //     { id: 'marks', title: 'Marks' },
+    //     { id: 'feedback', title: 'Feedback' },
+    //   ],
+    // });
 
-    await writer.writeRecords(results);
+    // await writer.writeRecords(results);
 
-    const csvUrl = `${req.protocol}://${req.get('host')}/download-results`;
-    res.json({ results, csvUrl });
+    // const csvUrl = `${req.protocol}://${req.get('host')}/download-results`;
+    // res.json({ results, csvUrl });
 
-  } catch (err) {
+  catch(err) {
     console.error("Batch evaluation failed:", err);
     res.status(500).json({ error: "Batch evaluation failed." });
   }
