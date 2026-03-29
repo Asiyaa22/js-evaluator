@@ -101,46 +101,75 @@ app.get('/dummy-testcases', (req, res) => {
 });
 
 
-// Core Evaluator: Run test cases on student function
-function runTest(studentCode, functionName, testCases) {
+// // Core Evaluator: Run test cases on student function
+// function runTest(studentCode, functionName, testCases) {
+//   const vm = new VM({ timeout: 1000, sandbox: {} });
+
+//   try {
+//     // Load student code into VM
+//     vm.run(studentCode);
+//     let passed = 0;
+
+//     // Evaluate each test case
+//     for (const { input, expected } of testCases) {
+//       const codeToRun = `(${functionName})(...${JSON.stringify(input)})`;
+//       const result = vm.run(codeToRun);
+
+//       // Compare output
+//       if (JSON.stringify(result) === JSON.stringify(expected)) {
+//         passed++;
+//       }
+//     }
+
+//     // Grading logic
+//     const percent = (passed / testCases.length) * 100;
+//     const score = percent === 100 ? 10 : percent >= 60 ? 6 : percent > 0 ? 3 : 0;
+//     const feedback = percent === 100
+//       ? "All test cases passed."
+//       : percent >= 60
+//       ? "Most test cases passed. Minor logic issues."
+//       : "Failed most test cases. Logic needs correction.";
+
+//     return { score, feedback };
+
+//   } catch {
+//     // If code crashes or syntax error
+//     return { score: 0, feedback: 'Code error. Check syntax or function structure.' };
+//   }
+// }
+
+function runTest(studentCode, functionName, testCode) {
   const vm = new VM({ timeout: 1000, sandbox: {} });
 
   try {
-    // Load student code into VM
     vm.run(studentCode);
-    let passed = 0;
 
-    // Evaluate each test case
-    for (const { input, expected } of testCases) {
-      const codeToRun = `(${functionName})(...${JSON.stringify(input)})`;
-      const result = vm.run(codeToRun);
+    const result = vm.run(testCode);
 
-      // Compare output
-      if (JSON.stringify(result) === JSON.stringify(expected)) {
-        passed++;
-      }
+    if (result === true) {
+      return {
+        score: 10,
+        feedback: "Passed"
+      };
+    } else {
+      return {
+        score: 0,
+        feedback: "Failed"
+      };
     }
 
-    // Grading logic
-    const percent = (passed / testCases.length) * 100;
-    const score = percent === 100 ? 10 : percent >= 60 ? 6 : percent > 0 ? 3 : 0;
-    const feedback = percent === 100
-      ? "All test cases passed."
-      : percent >= 60
-      ? "Most test cases passed. Minor logic issues."
-      : "Failed most test cases. Logic needs correction.";
-
-    return { score, feedback };
-
-  } catch {
-    // If code crashes or syntax error
-    return { score: 0, feedback: 'Code error. Check syntax or function structure.' };
+  } catch (err) {
+    return {
+      score: 0,
+      feedback: "Error in code execution"
+    };
   }
 }
 //Route: Evaluate by editor link
 app.post('/evaluate-batch-by-links', async (req, res) => {
   try {
     const { submissions, testCases } = req.body;
+    console.log("this is req body", req.body);
 
     // ✅ FIX: correct validation
     if (!submissions || !Array.isArray(submissions) || !testCases) {
@@ -155,7 +184,9 @@ app.post('/evaluate-batch-by-links', async (req, res) => {
       try {
         // ✅ fetch code
         const codeRes = await axios.get(submissionLink);
+        console.log("this is from submission link", codeRes);
         const studentCode = codeRes.data.code;
+        console.log("this si studentCOde", studentCode);
 
         if (!studentCode) {
           results.push({
