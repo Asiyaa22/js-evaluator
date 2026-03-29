@@ -144,7 +144,14 @@ function runTest(studentCode, functionName, testCode) {
   try {
     vm.run(studentCode);
 
-    const result = vm.run(testCode);
+    const wrappedTest = `
+      (function() {
+        ${testCode}
+      })();`
+
+    const result = vm.run(wrappedTest);
+
+    // const result = vm.run(testCode);
 
     if (result === true) {
       return {
