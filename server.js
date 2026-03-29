@@ -142,28 +142,26 @@ app.post('/evaluate-batch-by-links', async (req, res) => {
   try {
     const { submissions, testCases } = req.body;
 
-    if (!submissions || !Array.isArray(submissions) || !testCasesUrl) {
+    // ✅ FIX: correct validation
+    if (!submissions || !Array.isArray(submissions) || !testCases) {
       return res.status(400).json({ error: "Invalid payload" });
     }
 
-    // Fetch test cases once
-    // const testCasesRes = await axios.get(testCasesUrl);
-    const testConfig = testCases;
-
     const results = [];
-  for (const sub of submissions) {
-      const { submissionId, studentId, studentName, repoLink } = sub;
+
+    for (const sub of submissions) {
+      const { submissionId, student, submissionLink } = sub;
 
       try {
-        const codeRes = await axios.get(repoLink);
+        // ✅ fetch code
+        const codeRes = await axios.get(submissionLink);
         const studentCode = codeRes.data.code;
 
         if (!studentCode) {
           results.push({
             submissionId,
-            studentId,
-            studentName,
-            score: 0,
+            student,
+            marks: 0,
             feedback: "No code found."
           });
           continue;
@@ -172,31 +170,30 @@ app.post('/evaluate-batch-by-links', async (req, res) => {
         let totalMarks = 0;
         let feedbackList = [];
 
+        // ✅ FIX: match your DB structure
         for (const fn of testCases.testFunctions) {
           const result = runTest(
             studentCode,
-            fn.functionName,
-            fn.testCases
+            fn.name,        // ✅ your field
+            fn.test         // ✅ your field
           );
 
-          totalMarks += result.score;
-          feedbackList.push(`${fn.functionName}: ${result.feedback}`);
+          totalMarks += result.score || 0;
+          feedbackList.push(`${fn.name}: ${result.feedback}`);
         }
 
         results.push({
           submissionId,
-          studentId,
-          studentName,
-          score: totalMarks,
+          student,
+          marks: totalMarks,
           feedback: feedbackList.join(" | ")
         });
 
-      } catch {
+      } catch (err) {
         results.push({
           submissionId,
-          studentId,
-          studentName,
-          score: 0,
+          student,
+          marks: 0,
           feedback: "Failed to fetch or evaluate code."
         });
       }
@@ -204,33 +201,104 @@ app.post('/evaluate-batch-by-links', async (req, res) => {
 
     return res.json({ results });
 
-  }
-  
-
-    // Generate CSV
-    // const publicDir = path.join(__dirname, 'public');
-    // clearFolder(publicDir);
-
-    // const csvPath = path.join(publicDir, 'results.csv');
-    // const writer = csvWriter({
-    //   path: csvPath,
-    //   header: [
-    //     { id: 'student', title: 'Student Name' },
-    //     { id: 'marks', title: 'Marks' },
-    //     { id: 'feedback', title: 'Feedback' },
-    //   ],
-    // });
-
-    // await writer.writeRecords(results);
-
-    // const csvUrl = `${req.protocol}://${req.get('host')}/download-results`;
-    // res.json({ results, csvUrl });
-
-  catch(err) {
+  } catch (err) {
     console.error("Batch evaluation failed:", err);
     res.status(500).json({ error: "Batch evaluation failed." });
   }
 });
+// app.post('/evaluate-batch-by-links', async (req, res) => {
+//   try {
+//     const { submissions, testCases } = req.body;
+
+//     if (!submissions || !Array.isArray(submissions) || !testCasesUrl) {
+//       return res.status(400).json({ error: "Invalid payload" });
+//     }
+
+//     // Fetch test cases once
+//     // const testCasesRes = await axios.get(testCasesUrl);
+//     const testConfig = testCases;
+
+//     const results = [];
+//   for (const sub of submissions) {
+//       const { submissionId, studentId, studentName, repoLink } = sub;
+
+//       try {
+//         const codeRes = await axios.get(repoLink);
+//         const studentCode = codeRes.data.code;
+
+//         if (!studentCode) {
+//           results.push({
+//             submissionId,
+//             studentId,
+//             studentName,
+//             score: 0,
+//             feedback: "No code found."
+//           });
+//           continue;
+//         }
+
+//         let totalMarks = 0;
+//         let feedbackList = [];
+
+//         for (const fn of testCases.testFunctions) {
+//           const result = runTest(
+//             studentCode,
+//             fn.functionName,
+//             fn.testCases
+//           );
+
+//           totalMarks += result.score;
+//           feedbackList.push(`${fn.functionName}: ${result.feedback}`);
+//         }
+
+//         results.push({
+//           submissionId,
+//           studentId,
+//           studentName,
+//           score: totalMarks,
+//           feedback: feedbackList.join(" | ")
+//         });
+
+//       } catch {
+//         results.push({
+//           submissionId,
+//           studentId,
+//           studentName,
+//           score: 0,
+//           feedback: "Failed to fetch or evaluate code."
+//         });
+//       }
+//     }
+
+//     return res.json({ results });
+
+//   }
+  
+
+//     // Generate CSV
+//     // const publicDir = path.join(__dirname, 'public');
+//     // clearFolder(publicDir);
+
+//     // const csvPath = path.join(publicDir, 'results.csv');
+//     // const writer = csvWriter({
+//     //   path: csvPath,
+//     //   header: [
+//     //     { id: 'student', title: 'Student Name' },
+//     //     { id: 'marks', title: 'Marks' },
+//     //     { id: 'feedback', title: 'Feedback' },
+//     //   ],
+//     // });
+
+//     // await writer.writeRecords(results);
+
+//     // const csvUrl = `${req.protocol}://${req.get('host')}/download-results`;
+//     // res.json({ results, csvUrl });
+
+//   catch(err) {
+//     console.error("Batch evaluation failed:", err);
+//     res.status(500).json({ error: "Batch evaluation failed." });
+//   }
+// });
 
 // Route: Evaluate using zipUrl + testCasesUrl
 app.post('/evaluate-by-url', async (req, res) => {
